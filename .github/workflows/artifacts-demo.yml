@@ -1,0 +1,101 @@
+name: Artifacts example
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-files
+          path: dist/
+          retention-days: 5
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: dist/
+
+      - name: Run tests and generate coverage report
+        run: npm run test:full-report
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+  report:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: dist/
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+      - name: List build artifacts
+        run: |
+          echo "Build artifacts:"
+          ls -la dist/
+
+      - name: List coverage artifacts
+        run: |
+          echo "Coverage artifacts:"
+          ls -la coverage/
+
+      - name: Success message
+        run: echo "Build and test artifacts successfully collected"
+
+  size-check:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: dist/
+
+      - name: Check bundle size
+        run: |
+          SIZE=$(du -sb dist/ | cut -f1)
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "Build size: ${SIZE_MB}MB"
+          if [ $SIZE -gt 1048576 ]; then
+            echo "⚠️  WARNING: Build size exceeds 1MB!"
+          else
+            echo "✅ Build size is acceptable"
+          fi
