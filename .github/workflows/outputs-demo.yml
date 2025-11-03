@@ -1,0 +1,78 @@
+name: Outputs Demo
+
+on:
+  push:
+
+jobs:
+  info:
+    runs-on: ubuntu-latest
+    outputs:
+      commit-sha: ${{ steps.commit.outputs.sha }}
+      branch-name: ${{ steps.branch.outputs.name }}
+      commit-message: ${{ steps.message.outputs.text }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Get commit SHA
+        id: commit
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+
+      - name: Get branch name
+        id: branch
+        run: |
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "name=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Get commit message
+        id: message
+        run: |
+          MESSAGE=$(git log -1 --pretty=%B)
+          echo "text=$MESSAGE" >> $GITHUB_OUTPUT
+
+  build:
+    needs: info
+    runs-on: ubuntu-latest
+    outputs:
+      build-report: ${{ steps.report.outputs.content }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Print build info
+        run: |
+          echo "Building commit ${{ needs.info.outputs.commit-sha }} on branch ${{ needs.info.outputs.branch-name }}"
+
+      - name: Generate build report
+        id: report
+        run: |
+          {
+            echo "content<<EOF"
+            echo "Build Report"
+            echo "============"
+            echo "Node.js: $(node --version)"
+            echo "npm: $(npm --version)"
+            echo "Status: SUCCESS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+  summary:
+    needs: [info, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Display summary
+        run: |
+          echo "=== Workflow Summary ==="
+          echo "Commit SHA: ${{ needs.info.outputs.commit-sha }}"
+          echo "Branch: ${{ needs.info.outputs.branch-name }}"
+          echo "Message: ${{ needs.info.outputs.commit-message }}"
+          echo ""
+          echo "${{ needs.build.outputs.build-report }}"
