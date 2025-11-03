@@ -1,4 +1,4 @@
-name: Outputs Demo
+name: outputs_demo_job
 
 on:
   push:
